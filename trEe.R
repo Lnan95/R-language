@@ -1,7 +1,7 @@
-tree = function(train,label) {
+tree = function(train,label,w=100) {
   mi = min(train)
   ma = max(train)
-  box = seq(mi,ma,length.out = 50)
+  box = seq(mi,ma,length.out = w)
   gini = as.numeric()
   
   for (i in box) {
@@ -20,19 +20,50 @@ tree = function(train,label) {
     
     gini =c(gini, p1*p2*p3+p1_2*p2_2*p3_2)
   }
-  bound = box[which.min(gini)]
+  which_mini_gini = which.min(gini)
+  bound = box[which_mini_gini]
   
-  for (i in c(1:(50-which.min(gini)))) 
-    {
-    if (sum((train>box[which.min(gini)]) & (train<box[which.min(gini)+i])>0))
-      {
-      break
-    }
-    bound = 1/2*i*(ma-mi)/50+box[which.min(gini)]
+  if (gini[which_mini_gini]==0)
+  {
+    sep=train-bound
+    sep_1 = max(sep[sep<0])
+    sep_2 = min(sep[sep>0])
+    bound = (sep_2-sep_1)/2 + bound
   }
-  min_gini=min(gini[!is.na(gini)])
-
-  return(list(bound=bound,min_gini=min_gini,gini=gini,box=box))
+  
+  
+  return(data.frame(bound=bound,min_gini=gini[which_mini_gini]))
 }
 
-tree(train$Petal.Length,label)
+#> tree(x$Petal.Length,label)
+#bound min_gini
+#1 2.503535        0
+for (i in c(1:(w-which.min(gini)))) 
+{
+  if (sum((train>box[which.min(gini)]) & (train<box[which.min(gini)+i])>0))
+  {
+    break
+  }
+  bound = 1/2*i*(ma-mi)/w+box[which.min(gini)]
+}
+min_gini=min(gini[!is.na(gini)])
+#> tree(x$Petal.Length,label)
+#bound min_gini
+#1 2.455035        0
+
+
+tree_2 <- function(x,label,fun=tree)
+{
+  n = dim(x)[2L]
+  div = as.data.frame(apply(x,2,tree,label=label))
+  div_mini_gini = div[seq(2,to =n*2,by = 2)]
+  div_bound = div[seq(1,to = n*2,by = 2)]
+  whic = which.min(div_mini_gini)
+  frame = data.frame(bound=div_bound[whic],which=whic,row.names = NULL)
+  
+  return(frame)
+}
+
+
+
+
