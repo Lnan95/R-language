@@ -1,14 +1,11 @@
 box<-function(dot,x,y)
 {
-  
-  x>dot
-  x<=dot
-  l1=  label[x>dot]
-  l2 = label[x<=dot]
+  l1=  y[x>dot]
+  l2 = y[x<=dot]
   p1 = sum(l1 == "setosa")/length(l1)
   p2 = sum(l1 == "virginica")/length(l1)
   p3 = sum(l1 == "versicolor")/length(l1)
-  
+
   p1_2 = sum(l2 == "setosa")/length(l2)
   p2_2 = sum(l2 == "virginica")/length(l2)
   p3_2 = sum(l2 == "versicolor")/length(l2)
@@ -18,19 +15,20 @@ box<-function(dot,x,y)
 
 
 
-divide = function(train,label,w=100,box=box)
+sapply(X = xx,box,x=train$Sepal.Length,y=label)
+
+divide = function(train,label,fun=box)
 {
+  label = label[order(train)]
   train = train[order(train)]
-  gini = sapply(xx,box,x=train,y=label)
+  xx = unique(train)
+  gini = sapply(X = xx,fun,x=train,y=label)
   
-  which_mini_gini = which.min(gini)
-  bound = train[which_mini_gini]
-  
+  bound = xx[which.min(gini)]
   sep=train-bound
   sep_2 = min(sep[sep>0])
   bound = sep_2/2 + bound
-  
-  return(data.frame(bound=bound,min_gini=gini[which_mini_gini]))
+  return(data.frame(bound=bound,min_gini=min(gini,na.rm = T),check.names = F))
 }
 
 
