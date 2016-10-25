@@ -1,3 +1,4 @@
+#computing the gini
 box<-function(dot,x,y)
 {
   l1=  y[x>dot]
@@ -13,10 +14,7 @@ box<-function(dot,x,y)
   return(gini)
 }
 
-
-
-sapply(X = xx,box,x=train$Sepal.Length,y=label)
-
+#find the optimal edge in one feature
 divide = function(train,label,fun=box)
 {
   label = label[order(train)]
@@ -31,8 +29,7 @@ divide = function(train,label,fun=box)
   return(data.frame(bound=bound,min_gini=min(gini,na.rm = T),check.names = F))
 }
 
-
-
+#find the optimal edge in train
 tree <- function(x,label,fun=divide,is_random=FALSE,is_bagging=FALSE)
 {
   p = dim(x)[2L]
@@ -75,7 +72,6 @@ tree <- function(x,label,fun=divide,is_random=FALSE,is_bagging=FALSE)
 }
 
 #first bagging tree
-
 frame = data.frame(bound=0,which=0)
 for (i in c(1:1000)) 
 {
@@ -90,9 +86,8 @@ two = sum(frame$which==2)
 three = sum(frame$which==3)
 four = sum(frame$which==4)
 
-
 which.div = which.max(c(one,two,three,four))
-mean(frame[frame$which==which.div,1])
+bound = mean(frame[frame$which==which.div,1])
 
 
 
@@ -101,7 +96,7 @@ mean(frame[frame$which==which.div,1])
 frame = data.frame(bound=0,which=0)
 for (i in c(1:1000)) 
 {
-  new=tree(x,label,is_random = TRUE)
+  new=tree(train,label,is_random = TRUE)
   names(new)<-c("bound","which")
   frame = rbind(frame,new)
 }
@@ -114,14 +109,11 @@ four = sum(frame$which==4)
 
 
 which.div = which.max(c(one,two,three,four))
-mean(frame[frame$which==which.div,1])
+bound = frame[frame$which==which.div,1]
 
 
 #boosting#Î´×÷
 
-
-
-#
 
 
   
