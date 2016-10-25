@@ -1,7 +1,7 @@
 dat<-read.table("C:\\Users\\Manager\\Desktop\\15.txt")
 
 
-pla<-function(x)
+pla<-function(x,a=1)
 {
   count=0
   y = as.matrix(x[,5])
@@ -15,7 +15,7 @@ pla<-function(x)
       s = x[i,]%*%w                                        
       if (sign(s) != y[i]) 
       {
-        w = w+y[i]*x[i,]
+        w = w+a*y[i]*x[i,]
         count = count+1
       }
       
@@ -38,4 +38,14 @@ pla(dat)
 #$times
 #[1] 45
 
+n = sample(1:dim(dat)[1L],dim(dat)[1L])
+ddat<-dat[n,]
+pla(ddat)
 
+#> pla(ddat)
+#$w
+#1         2         3         4         5 
+#-3.000000  2.499569 -0.605193  2.182297  3.833544 
+#
+#$times
+#[1] 35
