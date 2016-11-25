@@ -1,18 +1,18 @@
-code.recorder<-function(number_of_rows,language,time)
+code.recorder<-function(number_of_rows,language,note='',time)
 {
   if (missing(time)) time <- Sys.Date()
   if (is.numeric(time)) 
   {
-    warning("è¯·è¾“å…¥'2016-04-21'ç±»å‹çš„æ—¶é—´ä¿¡æ¯")
+    warning("ÇëÊäÈë'2016-04-21'ÀàĞÍµÄÊ±¼äĞÅÏ¢")
     return()
   }
   x   <- data.frame(time=as.Date(time),language=toupper(language),
-               number_of_rows=number_of_rows,stringsAsFactors = F)
+                    number_of_rows=number_of_rows,note=note,stringsAsFactors = F)
   lib <- read.csv('code_recorder.csv',stringsAsFactors=F)
   lib <- rbind(x,lib)
   lib <- lib[order(as.Date(lib$time),decreasing = T),]
   write.csv(lib,'code_recorder.csv',row.names = FALSE)
-  cat('æ•°æ®å·²æ›´æ–°')
+  cat('Êı¾İÒÑ¸üĞÂ')
 }
 
 read.recorder   <- function() return(read.csv('code_recorder.csv',stringsAsFactors=F))
@@ -22,77 +22,77 @@ delete.recorder <- function(update=FALSE)
   {
     lib <- read.csv('code_recorder.csv',stringsAsFactors=F)
     print(lib)
-    cat('è¦åˆ é™¤å“ªä¸€è¡Œï¼Ÿ')
+    cat('ÒªÉ¾³ıÄÄÒ»ĞĞ£¿')
     n   <- scan(n = 1,quiet = T)
-    if (n<=0) return('è¯·è¾“å…¥æ­£ç¡®æ•°å€¼')
+    if (n<=0) return('ÇëÊäÈëÕıÈ·ÊıÖµ')
     print(lib[n,])
-    cat('ç¡®è®¤è¯·è¾“å…¥1')
+    cat('È·ÈÏÇëÊäÈë1')
     m   <- scan(n = 1,quiet = T)
     if (m==1) lib <- lib[-n,]
     write.csv(lib,'code_recorder.csv',row.names = FALSE)
+    cat('É¾³ı³É¹¦')
   } else {
-            lib <- read.csv('code_recorder.csv',stringsAsFactors=F)
-            print(lib)
-            cat('ä¿®æ”¹å“ªä¸€è¡Œæ•°æ®ï¼Ÿ')
-            m   <- scan(n = 1,quiet = T)
-            print(lib[m,])
-            cat('è¦ä¿®æ”¹å“ªä¸€åˆ—æ•°æ®ï¼Ÿ')
-            n   <- scan(n = 1,quiet = T)
-            print(as.character(lib[m,n]))
-            cat('æ˜¯ä¿®æ”¹',lib[m,n],'å—?æ˜¯è¾“å…¥1')
-            r   <- scan(n = 1,quiet = T)
-            if (r==1) 
-              {
-                cat('è¾“å…¥æ–°çš„æ•°å€¼:')
-                if (n!=3) new <- scan(n = 1,quiet = T,what = character())
-                else new <- scan(n = 1,quiet = T)
-                lib[n,m] <- new
-                write.csv(lib,'code_recorder.csv',row.names = FALSE)
-                cat('æ›´æ–°æˆåŠŸ')
-              }
-         }
+    lib <- read.csv('code_recorder.csv',stringsAsFactors=F)
+    print(lib)
+    cat('ĞŞ¸ÄÄÄÒ»ĞĞÊı¾İ£¿')
+    m   <- scan(n = 1,quiet = T)
+    print(lib[m,])
+    cat('ÒªĞŞ¸ÄÄÄÒ»ÁĞÊı¾İ£¿')
+    n   <- scan(n = 1,quiet = T)
+    print(as.character(lib[m,n]))
+    cat('ÊÇĞŞ¸Ä',lib[m,n],'Âğ?ÊÇÊäÈë1')
+    r   <- scan(n = 1,quiet = T)
+    if (r==1) 
+    {
+      cat('ÊäÈëĞÂµÄÊıÖµ:')
+      if (n!=3) new <- scan(n = 1,quiet = T,what = character())
+      else new <- scan(n = 1,quiet = T)
+      lib[n,m] <- new
+      write.csv(lib,'code_recorder.csv',row.names = FALSE)
+      cat('¸üĞÂ³É¹¦')
+    }
+  }
 }
 
-undate.recorder <- function(time)
+update.recorder <- function(time)
 {
   if (missing(time)) time = Sys.Date()
   lib = read.csv('code_recorder.csv',stringsAsFactors=F)
   x   = lib[as.Date(lib$time)==as.Date(time),]
-  if (dim(x)[1L] > 1) 
+  if (dim(x)[1L] > 1)
   {
     print(x)
-    cat('è¯·è¾“å…¥è¡Œ')
+    cat('ÇëÊäÈëĞĞ')
     row<- scan(n = 1,quiet = T)
-    if (row<1) return('è¡Œè¾“å…¥æœ‰è¯¯ï¼')
+    if (row<1) return('ĞĞÊäÈëÓĞÎó£¡')
     print(x[row,])
-    cat('è¾“å…¥1ç¡®å®šæ›´æ–°')
+    cat('ÊäÈë1È·¶¨¸üĞÂ')
     r  <- scan(n = 1,quiet = T)
-    if (r!=1) return('æ“ä½œå·²å–æ¶ˆ')
+    if (r!=1) return('²Ù×÷ÒÑÈ¡Ïû')
     else {
-            cat('è¯·è¾“å…¥å˜åŠ¨çš„æ•°å€¼')
-            n = scan(n = 1,quiet = T)
-            lib[as.Date(lib$time)==as.Date(time),3] = lib[as.Date(lib$time)==as.Date(time),3]+n
-            write.csv(lib,'code_recorder.csv',row.names = FALSE)
-            return('æ›´æ–°æˆåŠŸ')
-          }
+      cat('ÇëÊäÈë±ä¶¯µÄÊıÖµ')
+      n = scan(n = 1,quiet = T)
+      lib[as.Date(lib$time)==as.Date(time),][row,3] = lib[as.Date(lib$time)==as.Date(time),][row,3]+n
+      write.csv(lib,'code_recorder.csv',row.names = FALSE)
+      return('¸üĞÂ³É¹¦')
+    }
   } else {
-            print(x)
-            cat('è¾“å…¥1ç¡®å®šæ›´æ–°')
-            r  <- scan(n = 1,quiet = T)
-            if (r!=1) return('æ“ä½œå·²å–æ¶ˆ')
-            else {
-                    cat('è¯·è¾“å…¥å˜åŠ¨çš„æ•°å€¼')
-                    n = scan(n = 1,quiet = T)
-                    lib[as.Date(lib$time)==as.Date(time),3] <- x[,3]+n
-                    write.csv(lib,'code_recorder.csv',row.names = FALSE)
-                    return('æ›´æ–°æˆåŠŸ')
-                  }
-         }
-  
+    print(x)
+    cat('ÊäÈë1È·¶¨¸üĞÂ')
+    r  <- scan(n = 1,quiet = T)
+    if (r!=1) return('²Ù×÷ÒÑÈ¡Ïû')
+    else {
+      cat('ÇëÊäÈë±ä¶¯µÄÊıÖµ')
+      n = scan(n = 1,quiet = T)
+      lib[as.Date(lib$time)==as.Date(time),3] <- lib[as.Date(lib$time)==as.Date(time),3]+n
+      write.csv(lib,'code_recorder.csv',row.names = FALSE)
+      return('¸üĞÂ³É¹¦')
+    }
+  }
 }
 
 
-x=data.frame(time=as.Date('2016-11-24'),language='R',number_of_rows=185,stringsAsFactors = F)
-y=data.frame(time=as.Date('2016-11-13'),language='MATLAB',number_of_rows=475,stringsAsFactors = F)
+x=data.frame(time=as.Date('2016-11-24'),language='R',number_of_rows=185,note='ggplot,echarts',stringsAsFactors = F)
+y=data.frame(time=as.Date('2016-11-13'),language='MATLAB',number_of_rows=475,note='classify tree',stringsAsFactors = F)
 x=rbind(x,y)
-write.csv(x,'code_recorder.csv',row.names = FALSE)
+#write.csv(x,'code_recorder.csv',row.names = FALSE)
