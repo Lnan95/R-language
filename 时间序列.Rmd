@@ -1,0 +1,318 @@
+---
+title: "网站质量与企业价值的数据分析报告"
+author: "林思南"
+date: "2016年12月29日"
+output: 
+  html_document :
+    fig_width: 10
+    fig_height: 7
+fontsize: 7pt
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+#0.软件环境设置
+```{r,message=FALSE,warning=FALSE}
+library(tseries)
+library(tidyverse)
+library(randomForest)
+library(rattle)
+library(caret)
+library(rpart)
+library(knitr)
+library(reprtree)
+#画图函数的参数设置
+my_theme <- function(base_size = 12, base_family = "sans"){
+  theme_minimal(base_size = base_size, base_family = base_family) +
+    theme(
+      axis.text = element_text(size = 12),
+      axis.text.x = element_text(angle = 45, vjust = 0.5, hjust = 0.5),
+      axis.title = element_text(size = 14),
+      panel.grid.major = element_line(color = "grey"),
+      panel.grid.minor = element_blank(),
+      panel.background = element_rect(fill = "aliceblue"),
+      strip.background = element_rect(fill = "lightgrey", color = "grey", size = 1),
+      strip.text = element_text(face = "bold", size = 12, color = "black"),
+      legend.position = "bottom",
+      legend.justification = "top", 
+      legend.box = "horizontal",
+      legend.box.background = element_rect(colour = "grey50"),
+      legend.background = element_blank(),
+      panel.border = element_rect(color = "grey", fill = NA, size = 0.5)
+    )
+}
+```
+
+#1.数据整理
+```{r}
+dat <- read.csv("C:\\Users\\Manager\\Desktop\\data.csv")
+summary(dat)
+```
+
+我们可以发现alexa中国排名是一个常量，因此我们可以把其删去。
+
+其次，当日股价幅、开盘价、市值、市盈率和成交量都是反映出公司价值的变量，因此我们选择意义最为显著的市值作为因变量，再者，股价幅、开盘价、市盈率和成交量一定程度上也是市值的一种反应，比如市盈率 = 股价/每股收益，而且这三个变量与本次探究内容不相关，因此删去。
+
+最后，我们再将网站停留时间转换为秒，以方便后面的运算。
+
+
+```{r}
+#去除Alexa.China
+name <- names(dat)
+dat<-dat[,-grep('China',name)]
+
+#time.on.site数据调整
+name <- names(dat)
+char <- as.character(dat[,grep("site",name)])
+
+time_data <- strsplit(char,':')
+time_data_2 <- matrix(as.numeric(unlist(time_data)),ncol=2)
+time_on_site <- data.frame(time_on_site = time_data_2[,1]*60 + time_data_2[,2])
+
+dat[,grep("site",name)] <- time_on_site
+
+#去除当日股价幅、开盘价、市盈率和成交量变量
+dat<-dat[,-c(grep("gujia",name),grep("kaipanjia",name),grep("shiyinglv",name),grep("chengjiaoliang",name))]
+```
+
+
+
+
+#2.时间序列分析
+
+###2.1时间序列平稳性分析
+```{r}
+#将date数据转为时间序列格式
+dat$date=as.Date(dat$date)
+
+#市值的时间序列图
+qplot(date, shizhi, data = dat, geom = "line",ylab = "市值",xlab="时间",main = "市值的时间序列图")+geom_point(mapping = aes(x=date,y=shizhi))+ my_theme()
+```
+
+        
+由图，我们可以明显发现市值不是一个平稳的时间序列。为保证实验的准确性，我们对市值序列进行单位根检验：
+```{r}
+adf.test(dat$shizhi)
+```
+
+p值为0.6444，因此我们可以在显著性为0.1的水平上，接受原假设，市值变量不平稳。（原因：即市值变量和滞后n(n=1,2,3,4)期的市值变量的线性关系中，存在系数α的绝对值大于或等于1，使得其不平稳）
+
+###2.2非平稳序列的差分处理
+我们再看看差分处理后的数据：
+```{r,warning=FALSE}
+#计算市值变化的时间序列
+dat$delta_shizhi <- dat$shizhi - lag(dat$shizhi)
+qplot(date, delta_shizhi, data = dat, geom = "line",ylab = "市值变化量",xlab="时间",main = "市值变化量的时间序列图")+geom_point(mapping = aes(x=date,y=delta_shizhi)) + my_theme()
+
+#单位根检验
+delta<-dat$delta_shizhi[-1]#第一期数据无法做差，为缺失值，删去
+adf.test(delta)
+```
+
+由上结果所示，差分后的市值在显著性为0.05的水平下拒绝了原假设，因此我们可以将差分后的市值数列看作平稳序列。
+
+我们再对其他变量序列平稳性检验结果：
+```{r,warning=FALSE}
+nonsteady_index <- numeric()#用于存放未通过检验数据的引索值
+col <- 1:ncol(dat)
+name <- names(dat)
+for (i in col[-c(1,2,12)])
+{
+  cat(name[i],"的单位根检验结果:")
+  result=adf.test(dat[-1,i])
+  print(result)
+  cat("\n")
+  #储存未通过单位根检验数据的引索
+  if (result$p.value>0.05) nonsteady_index <- c(nonsteady_index,i)
+}
+```
+
+我们可以发现，除了每日浏览用户数,每用户浏览页面数,退出率和搜索来源用户比例外，其他变量都没有通过单位根检验。因此我们对没有通过单位根检验的数据进行查分变换。
+
+```{r,warning=FALSE}
+for (i in nonsteady_index)
+{
+  delta_i <- dat[,i] - lag(dat[,i])
+  cat(name[i],"的单位根检验结果:")
+  result=adf.test(delta_i[-1])
+  print(result)
+  cat("\n")
+  if (result$p.value<=0.05) dat[paste("delta_",name[i],sep = '')] <- delta_i #将差分后数据赋值到新的变量
+}
+```
+我们可以看到,一阶差分后的所有变量都在置信程度为0.05的水平上拒绝了原假设,都为平稳序列。
+
+#3.回归分析与模型检验
+###3.1多元情况下的线性回归分析
+```{r}
+dat_2 <- dat[-1,-c(1,2,nonsteady_index)] #整合所有平稳变量
+fit <- lm(delta_shizhi~.,data=dat_2)     #对函数进行多元最小二乘线性拟合
+summary(fit)                             #查看拟合情况
+anova(fit)                               #回归方程的单因素方差分析
+
+#市值变化的拟合时间序列图
+qplot(dat$date[-1], dat_2$delta_shizhi, geom = "line",color="市值变化曲线") + 
+  geom_line(mapping=aes(x=dat$date[-1],color="拟合曲线",y=fit$fitted.values)) + my_theme() +
+  labs(x = "时间",y = "市值变化量",subtitle = "市值变化量的拟合时间序列图")
+
+```
+
+可以看到，其中只有每日浏览用户数和每用户浏览页面数是在0.05的水平下是显著的，特别是每用户浏览页面数在方差分析中也表现得很显著，且对与市值的变化起有正相关的关系，R2为0.2322，但由于是多元模型我们应该更加留意修正后的拟残差。修正后的拟合R2为0.1066，拟合情况不算很理想。
+
+##3.2滞后变量的引入
+因为网站质量指标对同期市值变化量的影响不一定是同期的,可能昨天的高浏览对今天的市值产生影响,因此我们可以引进滞后1到3阶的自变量，因为引入了滞后变量可能导致多重共线性，导致因变量矩阵奇异或近似奇异，所以我们可以使用逐步回归法基于AIC值进行变量选择再拟合。
+
+```{r}
+#生成滞后1到3阶的自变量
+dat_base <- dat[,-c(1,2,nonsteady_index,grep("delta_shizhi",names(dat)))]
+
+name <- paste('lag',names(dat_base),sep="_")
+lag_1 <- as.data.frame(apply(dat_base,2,lag)[-1,])
+names(lag_1) <- name
+
+name <- paste('lag2',names(dat_base),sep="_")
+lag_2 <- as.data.frame(apply(dat_base,2,lag)[-1,])
+names(lag_2) <- name
+
+name <- paste('lag3',names(dat_base),sep="_")
+lag_3 <- as.data.frame(apply(dat_base,2,lag)[-1,])
+names(lag_3) <- name
+
+dat_lag3 <- cbind(dat_2,lag_1,lag_2,lag_3)                   #将1到3阶滞后变量与原数据合并
+dat_lag3 <- dat_lag3[apply(is.na(dat_lag3),1,sum)==0,]       #去掉带有NA的行
+
+fit_step <- step(lm(delta_shizhi~.,data=dat_lag3),trace=F)   #进行逐步回归法
+summary(fit_step)
+```
+
+我们可以看到，滞后一阶的网站停留时间被选进了模型，模型的调整后R2提高到了0.1606。
+
+加入滞后一阶的网站停留时间的市值变化量的拟合时间序列图
+```{r}
+#加入滞后一阶的网站停留时间的市值变化量的拟合时间序列图
+qplot(x=dat$date[-c(1:2)], y=dat_lag3$delta_shizhi, geom = "line",color="市值变化曲线") + 
+  geom_line(mapping=aes(x=dat$date[-c(1:2)],color="无滞后变量的最小二乘拟合曲线",y=fit$fitted.values[-1])) +
+  geom_line(mapping=aes(x=dat$date[-c(1:2)],color="加入滞后变量的逐步回归拟合曲线",y=fit_step$fitted.values)) + 
+  my_theme() + labs(x = "时间",y = "市值变化量",subtitle = "市值变化量的拟合时间序列图")
+```
+
+
+#4.非参数方法
+
+我们可以尝试使用一些非参数的方法来对函数进行拟合，比如决策树方法：
+
+###4.1分类回归树算法(Classification And Regression Tree)
+根据节点基尼值分割的CART算法
+```{r}
+fit_cart <- rpart(delta_shizhi ~ .,
+             data = dat_lag3)
+
+#绘制树形图
+fancyRpartPlot(fit_cart)
+```
+
+```{r,include=F}
+sammary_cart <- summary(fit_cart)
+```
+```{r}
+cart_importance <- data.frame(variable.importance = sammary_cart$variable.importance)
+kable(cart_importance, format = "markdown", padding = 0)
+```
+
+
+###4.2随机森林算法
+随机森林是一种集成学习的算法，基于bootstrap方法利用数据和特征的子集训练成一个个弱分类器，再用多个弱分类器进行组合，最后形成一个强分类器的算法。
+
+```{r}
+set.seed(1)
+rf <- randomForest(delta_shizhi~.,data=dat_lag3,importance = T)
+```
+
+根据对变量增加人为扰动而对均方误差(Mean Squared Error)的影响得到的变量重要性排行
+```{r}
+#变量重要性
+varImpPlot(rf,type=1,main='特征重要性排行')
+```
+
+
+#5.模型比较
+
+由上述的2个线性模型和2个决策树模型得出的变量重要性都存在挺大的差异（可能因为数据量较小），为了选出最为显著的因变量，我们可以将以上4组模型进行十折交叉验证（10-fold cross-validation），看看拟合效果最好的是哪一种模型。
+
+```{r}
+#交叉验证函数的编写
+tenfoldcv <- function(dat=dat_lag3,class="rf"){
+  #输入对应的数据，选择相应的模型名称即可,输入"rf"为随机森林算法，
+  #"lm"为最小二乘法，"step"为逐步回归法，"cart"为回归决策树算法。
+  n <- dim(dat)[1]        #数据量
+  m <- round(n/10)        #每折数据数
+  index <- sample(1:n,n)
+  model <- switch(class,cart=rpart, lm=lm, step=step,randomForest) #选择相应模型
+  y_hat <- numeric(n)    #10个空数值，存放每次交叉检验的yhat
+  y_index <- grep("delta_shizhi",names(dat))    #目标变量的索引值
+  #10-fold cross-validation
+  for (i in 1:10)
+  {
+    if (i == 10) index_i <- index[(m*9+1):n]
+    else index_i <- index[(m*(i-1)+1):(m*i)]
+    test_label <- dat[,y_index,drop=FALSE]      #选择目标变量，drop参数让数据不因维度改变而改变格式
+    test_data  <- dat[index_i,-y_index]
+    train      <- dat[-index_i,]
+    if (class!='step') fit <- model(delta_shizhi~.,data=train) #逐步回归法需要特殊处理
+    else fit <- step(lm(delta_shizhi~.,data=train),trace=F)
+    y_hat[index_i] <- predict(fit,test_data)
+  }
+  #计算十折交叉验证的均方误差(Mean Squared Error)
+  y <- dat[index,y_index]  #对应10次预测的顺序的目标值，即delta_shizhi
+  mse <- sqrt(sum((y-y_hat)^2)/n)
+  return(mse)
+}
+```
+
+对四种模型进行比较：
+```{r}
+set.seed(1)
+#不带滞后数据的最小二乘模型
+mse_lm <- tenfoldcv(dat=dat_2,class="lm")
+#带滞后数据的逐步回归模型
+mse_step <- tenfoldcv(dat=dat_lag3,class="step")
+#带滞后数据的回归决策树模型
+mse_cart <- tenfoldcv(dat=dat_lag3,class="cart")
+#带滞后数据的随机森林模型
+mse_rf <- tenfoldcv(dat=dat_lag3,class="rf")
+
+kable(data.frame(不带滞后数据的最小二乘模型 =mse_lm,带滞后数据的逐步回归模型 = mse_step,
+       带滞后数据的回归决策树模型=mse_cart,带滞后数据的随机森林模型=mse_rf),format = "html", 
+      table.attr = "class=\"table table-bordered\"",align="c")
+```
+
+
+#6.总结
+
+###6.1数据分析结果：
+
+带滞后数据的随机森林方法在四种算法中表现最好，我们有理由相信随机森林模型得出的变量重要性可信度较高，即预测市值变化量上，最重要的前十个网站质量指标为：
+```{r,echo=FALSE}
+rows <- 1:10
+var <- c("滞后三阶的每日浏览用户数","滞后一阶的每日浏览用户数","滞后二阶的每日浏览用户数","滞后三阶的每用户浏览页面数","滞后一阶的到达率变化量","滞后一阶的网站停留时间","滞后二阶的退出率","滞后三阶的搜索来源用户比例","同期的每日浏览用户数","滞后一阶的每用户浏览页面数")
+df <- data.frame(排名=rows,网站质量指标=var)
+kable(df,format = "html", 
+      table.attr = "class=\"table table-bordered\"",align="c",caption = "对企业市值变化影响最大的十个网站质量指标")
+``` 
+同时我们也发现，均方误差最低的三组模型都引入了滞后变量，这也正好印证了我们之前的假设：存在网站质量指标对未来的市值变化量产生影响。
+
+当然，带滞后数据的逐步回归法: 
+  $$           市值变化量=β_{0}+β_{1}每用户浏览页面数+β_{2}每日浏览用户数+β_{3}滞后一阶的网站停留时间+ε$$
+
+
+的均方误差与随机森林算法所得的均方误差相差不大，也不能否定同期的每日浏览用户数和每用户浏览页面数对市值的变化的影响，我们仍需要更多的数据进行对比。同样，由于数据量较小，更高阶的滞后数据无法加入，因此武断地判断滞后3阶的每日浏览用户数一定就是对企价值影响最大的网站质量指标是不理智的。
+ 
+
+
+###6.2综合业务进行分析:
+
+```
+网站吸引力对价值有影响密爹密爹的,参照ppt上面的每个变量的意义瞎说一通~
+```
